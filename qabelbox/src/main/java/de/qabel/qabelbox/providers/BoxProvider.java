@@ -1,6 +1,8 @@
 package de.qabel.qabelbox.providers;
 
 import android.app.NotificationManager;
+import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.MatrixCursor;
@@ -47,6 +49,8 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import de.qabel.QabelContentProviderConstants;
+import de.qabel.core.config.Identity;
 import de.qabel.core.crypto.QblECKeyPair;
 import de.qabel.qabelbox.exceptions.QblStorageException;
 import de.qabel.qabelbox.exceptions.QblStorageNotFound;
@@ -137,18 +141,39 @@ public class BoxProvider extends DocumentsProvider {
         String[] netProjection = reduceProjection(projection, DEFAULT_ROOT_PROJECTION);
 
         MatrixCursor result = new MatrixCursor(netProjection);
-        final MatrixCursor.RowBuilder row = result.newRow();
-        row.add(Root.COLUMN_ROOT_ID,
-                mDocumentIdParser.buildId(PUB_KEY,
-                        BUCKET, PREFIX, null));
-        row.add(Root.COLUMN_DOCUMENT_ID,
-                mDocumentIdParser.buildId(PUB_KEY,
-                        BUCKET, PREFIX, "/"));
-        row.add(Root.COLUMN_ICON, R.drawable.qabel_logo);
-        row.add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_CREATE);
-        row.add(Root.COLUMN_TITLE, "Qabel Box Test2");
-        row.add(Root.COLUMN_SUMMARY, "Foobar");
+        for (Identity identity: getIdentities()) {
+            final MatrixCursor.RowBuilder row = result.newRow();
+            String keyIdentifier = identity.getEcPublicKey().getReadableKeyIdentifier();
+            row.add(Root.COLUMN_ROOT_ID,
+                    mDocumentIdParser.buildId(keyIdentifier,
+                            BUCKET, PREFIX, null));
+            row.add(Root.COLUMN_DOCUMENT_ID,
+                    mDocumentIdParser.buildId(keyIdentifier,
+                            BUCKET, PREFIX, "/"));
+            row.add(Root.COLUMN_ICON, R.drawable.qabel_logo);
+            row.add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_CREATE);
+            row.add(Root.COLUMN_TITLE, "Qabel Box " + identity.getAlias());
+            row.add(Root.COLUMN_SUMMARY, keyIdentifier);
+        }
         return result;
+    }
+
+    List<Identity> getIdentities() {
+        Uri uri = new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT)
+                .authority(QabelContentProviderConstants.CONTENT_AUTHORITY)
+                .appendPath(QabelContentProviderConstants.CONTENT_IDENTITIES).build();
+        Cursor cursor = getContext().getContentResolver().query(uri,
+                QabelContentProviderConstants.IDENTITIES_COLUMN_NAMES, null, null, null);
+        List<Identity> identities = new ArrayList<>();
+        if (cursor == null) {
+            Log.e(TAG, "Could not retrieve identities from content provider");
+            return identities;
+        }
+        while (cursor.moveToNext()) {
+            String alias = cursor.getString(1);
+            identities.add(new Identity(alias, null, new QblECKeyPair()));
+        }
+        return identities;
     }
 
     private String[] reduceProjection(String[] projection, String[] supportedProjection) {
@@ -165,19 +190,32 @@ public class BoxProvider extends DocumentsProvider {
         return result.toArray(projection);
     }
 
-    public BoxVolume getVolumeForRoot(String identity, String bucket, String prefix) {
+    public BoxVolume getVolumeForRoot(String identity, String bucket, String prefix) throws FileNotFoundException {
         if (bucket == null) {
             bucket = BUCKET;
         }
         if (prefix == null) {
             prefix = PREFIX;
         }
-        QblECKeyPair testKey = new QblECKeyPair(Hex.decode(PRIVATE_KEY));
+        Identity selectedIdentity;
+        for (Identity id: getIdentities()) {
+            String identifier = id.getEcPublicKey().getReadableKeyIdentifier();
+            if (identity.equals(identifier)) {
+                Log.d(TAG, "Checking identity: " + identifier);
+                selectedIdentity = id;
+                break;
+            }
+        }
+        selectedIdentity = getIdentities().get(0);
 
+        if (selectedIdentity == null) {
+            Log.e(TAG, "Identity not found for public key " + identity);
+            throw new FileNotFoundException("Identity not found");
+        }
         setUpTransferUtility();
 
-        return new BoxVolume(transferUtility, awsCredentials, testKey, bucket, prefix,
-                    QabelBoxApplication.getDeviceID(), getContext());
+        return new BoxVolume(transferUtility, awsCredentials, selectedIdentity.getPrimaryKeyPair(),
+                bucket, prefix, QabelBoxApplication.getDeviceID(), getContext());
     }
 
     @Override

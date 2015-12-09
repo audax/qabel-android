@@ -38,6 +38,7 @@ import com.google.zxing.integration.android.IntentIntegrator;
 
 import org.apache.commons.io.IOUtils;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -157,6 +158,7 @@ public class MainActivity extends AppCompatActivity
                         for (Identity identity : identities.getIdentities()) {
                             if (identity.getPersistenceID().equals(lastID)) {
                                 activeIdentity = identity;
+                                onIdentitySelected();
                                 runOnUiThread(new Runnable() {
                                     @Override
                                     public void run() {
@@ -223,6 +225,18 @@ public class MainActivity extends AppCompatActivity
                     break;
             }
         }
+    }
+
+    private void onIdentitySelected() {
+        try {
+            boxVolume = provider.getVolumeForRoot(
+                    activeIdentity.getEcPublicKey().getReadableKeyIdentifier(),
+                    null, null);
+        } catch (FileNotFoundException e) {
+            Log.e(TAG, "Could not open volume", e);
+            return;
+        }
+        initFilesFragment();
     }
 
     /**
@@ -343,9 +357,11 @@ public class MainActivity extends AppCompatActivity
 
         provider = ((QabelBoxApplication) getApplication()).getProvider();
         Log.i(TAG, "Provider: " + provider);
-        boxVolume = provider.getVolumeForRoot(null, null, null);
 
-        initFilesFragment();
+        if (activeIdentity != null) {
+            onIdentitySelected();
+        }
+
 
         initFloatingActionButton();
 
@@ -1070,6 +1086,14 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void selectFilesFragment() {
+        if (activeIdentity == null) {
+            Toast.makeText(self, R.string.select_identity,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (filesFragment == null) {
+            onIdentitySelected();
+        }
         fab.show();
         filesFragment.setIsLoading(false);
         getFragmentManager().beginTransaction()

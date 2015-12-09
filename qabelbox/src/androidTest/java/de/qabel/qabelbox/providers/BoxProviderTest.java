@@ -3,11 +3,13 @@ package de.qabel.qabelbox.providers;
 import android.annotation.TargetApi;
 import android.content.ContentResolver;
 import android.database.Cursor;
+import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.test.ProviderTestCase2;
+import android.test.mock.MockContentProvider;
 import android.util.Log;
 
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility;
@@ -32,6 +34,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import de.qabel.QabelContentProviderConstants;
+import de.qabel.core.config.Identity;
 import de.qabel.core.crypto.CryptoUtils;
 import de.qabel.core.crypto.QblECKeyPair;
 import de.qabel.qabelbox.exceptions.QblStorageException;
@@ -40,6 +44,7 @@ import de.qabel.qabelbox.storage.BoxNavigation;
 import de.qabel.qabelbox.storage.BoxVolume;
 import de.qabel.qabelbox.activities.MainActivity;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -91,7 +96,7 @@ public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
         testFileName = file.getAbsolutePath();
 
         mContentResolver = getContext().getContentResolver();
-
+        addMockQabelContentProvider();
     }
 
     @Override
@@ -291,5 +296,24 @@ public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
         navigate.navigate(folder);
         assertThat(volume.getDocumentId(navigate.getPath()), is(ROOT_DOC_ID + "testfolder/"));
     }
+
+    public void testGetIdentities() {
+        List<Identity> identities = getProvider().getIdentities();
+        assertThat(identities.size(), equalTo(3));
+    }
+    private void addMockQabelContentProvider() {
+        getMockContentResolver().addProvider(QabelContentProviderConstants.CONTENT_AUTHORITY,
+                new MockContentProvider(getMockContext()) {
+                    @Override
+                    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+                        MatrixCursor cursor = new MatrixCursor(QabelContentProviderConstants.IDENTITIES_COLUMN_NAMES);
+						cursor.addRow(new String[] {"foo", "foo_id"});
+                        cursor.addRow(new String[] {"bar", "bar_id"});
+                        cursor.addRow(new String[] {"baz", "baz_id"});
+                        return cursor;
+                    }
+                });
+    }
+
 
 }

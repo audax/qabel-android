@@ -33,6 +33,8 @@ public class BoxVolume {
 	private static final String PATH_ROOT = "/";
 	private final String rootId;
 	private final Context context;
+	private final String prefix;
+	private final String bucket;
 
 	private TransferUtility transferUtility;
 	private QblECKeyPair keyPair;
@@ -48,6 +50,8 @@ public class BoxVolume {
 		this.keyPair = keyPair;
 		this.deviceId = deviceId;
 		this.context = context;
+		this.bucket = bucket;
+		this.prefix = prefix;
 		cryptoUtils = new CryptoUtils();
 		tempDir = context.getCacheDir();
 		AmazonS3Client awsClient = new AmazonS3Client(credentials);
@@ -153,5 +157,9 @@ public class BoxVolume {
 		}
 
 
+	}
+
+	public void createIndex() throws QblStorageException {
+		createIndex(bucket, prefix);
 	}
 }
