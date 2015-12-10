@@ -48,6 +48,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import de.qabel.ackack.MessageInfo;
 import de.qabel.ackack.Responsible;
@@ -765,16 +767,29 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPasswordEntered(char[] password) {
-        if (((QabelBoxApplication) getApplication()).init(password)) {
-            setDrawerLocked(false);
-            if (QabelBoxApplication.getLastActiveIdentityID().equals("")) {
-                selectAddIdentityFragment();
-            } else {
-                selectFilesFragment();
-            }
-        } else {
-            selectOpenDatabaseFragment();
-        }
+		new AsyncTask<char[], Void, Boolean>() {
+			Boolean init;
+			@Override
+			protected Boolean doInBackground(char[]... params) {
+				init = ((QabelBoxApplication) getApplication()).init(params[0]);
+				return init;
+			}
+
+			@Override
+			protected void onPostExecute(Boolean aBoolean) {
+				super.onPostExecute(aBoolean);
+				if (init) {
+					setDrawerLocked(false);
+					if (QabelBoxApplication.getLastActiveIdentityID().equals("")) {
+						selectAddIdentityFragment();
+					} else {
+						selectFilesFragment();
+					}
+				} else {
+					selectOpenDatabaseFragment();
+				}
+			}
+		}.execute(password);
     }
 
     @Override
