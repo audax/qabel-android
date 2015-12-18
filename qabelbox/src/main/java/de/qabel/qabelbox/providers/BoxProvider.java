@@ -99,7 +99,7 @@ public class BoxProvider extends DocumentsProvider {
 
     private Map<String, BoxCursor> folderContentCache;
     private String currentFolder;
-    private LocalQabelService mService;
+    LocalQabelService mService;
 
     @Override
     public boolean onCreate() {
@@ -108,20 +108,7 @@ public class BoxProvider extends DocumentsProvider {
             Log.e(TAG, "No context available in BoxProvider, exiting");
             return false;
         }
-        Intent intent = new Intent(context, LocalQabelService.class);
-        context.bindService(intent, new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                LocalQabelService.LocalBinder binder = (LocalQabelService.LocalBinder) service;
-                mService = binder.getService();
-                notifyRootsUpdated();
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                mService = null;
-            }
-        }, Context.BIND_AUTO_CREATE);
+        bindToService(context);
         mDocumentIdParser = new DocumentIdParser();
 
         mThreadPoolExecutor = new ThreadPoolExecutor(
@@ -149,7 +136,24 @@ public class BoxProvider extends DocumentsProvider {
         return true;
     }
 
-	/**
+    void bindToService(Context context) {
+        Intent intent = new Intent(context, LocalQabelService.class);
+        context.bindService(intent, new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                LocalQabelService.LocalBinder binder = (LocalQabelService.LocalBinder) service;
+                mService = binder.getService();
+                notifyRootsUpdated();
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                mService = null;
+            }
+        }, Context.BIND_AUTO_CREATE);
+    }
+
+    /**
      * Notify the system that the roots have changed
      * This happens if identities or prefixes changed.
      */
