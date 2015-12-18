@@ -41,24 +41,14 @@ import org.apache.commons.io.IOUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 
-import de.qabel.ackack.MessageInfo;
-import de.qabel.ackack.Responsible;
-import de.qabel.ackack.event.EventActor;
-import de.qabel.ackack.event.EventListener;
-import de.qabel.core.EventNameConstants;
 import de.qabel.core.config.Contact;
-import de.qabel.core.config.Contacts;
-import de.qabel.core.config.Identities;
 import de.qabel.core.config.Identity;
-import de.qabel.core.config.ResourceActor;
 import de.qabel.qabelbox.QabelBoxApplication;
 import de.qabel.qabelbox.R;
 import de.qabel.qabelbox.adapter.FilesAdapter;
@@ -96,8 +86,8 @@ public class MainActivity extends AppCompatActivity
     private static final String TAG = "BoxMainActivity";
     private static final int REQUEST_CODE_OPEN = 11;
     private static final int REQUEST_CODE_UPLOAD_FILE = 12;
-    public static final String HARDCODED_ROOT = BoxProvider.PUB_KEY
-            + BoxProvider.DOCID_SEPARATOR + BoxProvider.BUCKET + BoxProvider.DOCID_SEPARATOR
+    public static final String HARDCODED_ROOT = BoxProvider.DOCID_SEPARATOR
+            + BoxProvider.BUCKET + BoxProvider.DOCID_SEPARATOR
             + BoxProvider.PREFIX + BoxProvider.DOCID_SEPARATOR + BoxProvider.PATH_SEP;
     private static final int REQUEST_CODE_DELETE_FILE = 13;
     private static final int REQUEST_CODE_CHOOSE_EXPORT = 14;
@@ -191,8 +181,10 @@ public class MainActivity extends AppCompatActivity
         String displayName = cursor.getString(
                 cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
         Log.i(TAG, "Displayname: " + displayName);
+        String keyIdentifier = mService.getActiveIdentity().getEcPublicKey()
+                .getReadableKeyIdentifier();
         Uri uploadUri = DocumentsContract.buildDocumentUri(
-                BoxProvider.AUTHORITY, HARDCODED_ROOT + displayName);
+                BoxProvider.AUTHORITY, keyIdentifier + HARDCODED_ROOT + displayName);
         try {
             OutputStream outputStream = getContentResolver().openOutputStream(uploadUri, "w");
             if (outputStream == null) {
@@ -244,7 +236,9 @@ public class MainActivity extends AppCompatActivity
 
         provider = ((QabelBoxApplication) getApplication()).getProvider();
         Log.i(TAG, "Provider: " + provider);
-        boxVolume = provider.getVolumeForRoot(null, null, null);
+
+        provider.setLocalService(mService);
+        initBoxVolume();
 
         initFilesFragment();
 
@@ -310,6 +304,12 @@ public class MainActivity extends AppCompatActivity
                 }
             }
         });
+    }
+
+    private void initBoxVolume() {
+        boxVolume = provider.getVolumeForRoot(
+                mService.getActiveIdentity().getEcPublicKey().getReadableKeyIdentifier(),
+                null, null);
     }
 
     private void initFloatingActionButton() {
@@ -618,23 +618,29 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void selectIdentity(Identity identity) {
-        mService.setActiveIdentity(identity);
-        selectContactsFragment();
+        changeActiveIdentity(identity);
 
-        textViewSelectedIdentity.setText(identity.getAlias());
+        selectContactsFragment();
     }
 
     @Override
     public void addIdentity(Identity identity) {
         mService.addIdentity(identity);
-        mService.setActiveIdentity(identity);
+        changeActiveIdentity(identity);
+        provider.notifyRootsUpdated();
 
         Snackbar.make(appBarMain, "Added identity: " + identity.getAlias(), Snackbar.LENGTH_LONG)
                 .show();
 
-        textViewSelectedIdentity.setText(identity.getAlias());
-
         selectFilesFragment();
+    }
+
+    private void changeActiveIdentity(Identity identity) {
+        mService.setActiveIdentity(identity);
+        textViewSelectedIdentity.setText(identity.getAlias());
+        getFragmentManager().beginTransaction().remove(filesFragment).commit();
+        initBoxVolume();
+        initFilesFragment();
     }
 
     @Override
@@ -660,11 +666,13 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void deleteIdentity(Identity identity) {
+        provider.notifyRootsUpdated();
         mService.deleteIdentity(identity);
     }
 
     @Override
     public void modifyIdentity(Identity identity) {
+        provider.notifyRootsUpdated();
         mService.modifyIdentity(identity);
     }
 
