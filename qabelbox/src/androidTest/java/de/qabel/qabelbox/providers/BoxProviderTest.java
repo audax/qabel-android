@@ -2,6 +2,7 @@ package de.qabel.qabelbox.providers;
 
 import android.annotation.TargetApi;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -32,9 +33,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import de.qabel.core.config.Identities;
 import de.qabel.core.crypto.CryptoUtils;
 import de.qabel.core.crypto.QblECKeyPair;
 import de.qabel.qabelbox.exceptions.QblStorageException;
+import de.qabel.qabelbox.services.LocalQabelService;
 import de.qabel.qabelbox.storage.BoxFolder;
 import de.qabel.qabelbox.storage.BoxNavigation;
 import de.qabel.qabelbox.storage.BoxVolume;
@@ -43,7 +46,7 @@ import de.qabel.qabelbox.activities.MainActivity;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
+public class BoxProviderTest extends ProviderTestCase2<BoxProviderTest.BoxProviderTester>{
 
     private BoxVolume volume;
     final String bucket = BoxProvider.BUCKET;
@@ -52,14 +55,25 @@ public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
     private String testFileName;
     private ContentResolver mContentResolver;
 
+    public static final String PUB_KEY = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
+    public static final String PRIVATE_KEY = "77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a";
+
     private static final String TAG = "BoxProviderTest";
 
-    public BoxProviderTest(Class<BoxProvider> providerClass, String providerAuthority) {
+    class BoxProviderTester extends BoxProvider {
+
+        void bindToService(Context context) {
+            mService = new LocalQabelService() {
+            };
+        }
+    }
+
+    public BoxProviderTest(Class<BoxProviderTester> providerClass, String providerAuthority) {
         super(providerClass, providerAuthority);
     }
 
     public BoxProviderTest() {
-        this(BoxProvider.class, BoxProvider.AUTHORITY);
+        this(BoxProviderTester.class, BoxProvider.AUTHORITY);
     }
 
     @Override
@@ -68,8 +82,8 @@ public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
         Log.d(TAG, "setUp");
         CryptoUtils utils = new CryptoUtils();
         byte[] deviceID = utils.getRandomBytes(16);
-        QblECKeyPair keyPair = new QblECKeyPair(Hex.decode(BoxProvider.PRIVATE_KEY));
-        ROOT_DOC_ID = BoxProvider.PUB_KEY + BoxProvider.DOCID_SEPARATOR + BoxProvider.BUCKET
+        QblECKeyPair keyPair = new QblECKeyPair(Hex.decode(PRIVATE_KEY));
+        ROOT_DOC_ID = PUB_KEY + BoxProvider.DOCID_SEPARATOR + BoxProvider.BUCKET
                 + BoxProvider.DOCID_SEPARATOR + prefix + BoxProvider.DOCID_SEPARATOR
                 + BoxProvider.PATH_SEP;
         BoxProvider provider = getProvider();
