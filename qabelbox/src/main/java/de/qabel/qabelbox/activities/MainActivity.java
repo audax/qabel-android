@@ -243,6 +243,18 @@ public class MainActivity extends AppCompatActivity
     private void onLocalServiceConnected() {
         Log.d(TAG, "LocalQabelService connected");
 
+        if (mService.getActiveIdentity() == null) {
+            selectAddIdentityFragment();
+            return;
+        }
+
+        initFloatingActionButton();
+
+        initDrawer();
+
+        textViewSelectedIdentity.setText(mService.getActiveIdentity().getAlias());
+
+
         provider = ((QabelBoxApplication) getApplication()).getProvider();
         Log.i(TAG, "Provider: " + provider);
 
@@ -252,12 +264,6 @@ public class MainActivity extends AppCompatActivity
         initFilesFragment();
 
         self = this;
-
-        initFloatingActionButton();
-
-        initDrawer();
-
-        textViewSelectedIdentity.setText(mService.getActiveIdentity().getAlias());
 
 
         // Check if activity is started with ACTION_SEND or ACTION_SEND_MULTIPLE
