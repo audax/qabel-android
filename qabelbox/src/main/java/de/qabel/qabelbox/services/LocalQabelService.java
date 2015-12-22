@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import de.qabel.ackack.event.EventEmitter;
 import de.qabel.core.config.Account;
@@ -34,7 +35,9 @@ import de.qabel.core.config.SyncedModuleSettings;
 import de.qabel.core.config.SyncedSettings;
 import de.qabel.core.crypto.BinaryDropMessageV0;
 import de.qabel.core.crypto.CryptoUtils;
+import de.qabel.core.drop.DropActor;
 import de.qabel.core.drop.DropMessage;
+import de.qabel.core.drop.DropResultContact;
 import de.qabel.core.drop.DropURL;
 import de.qabel.core.exceptions.QblDropPayloadSizeException;
 import de.qabel.core.exceptions.QblInvalidEncryptionKeyException;
@@ -61,6 +64,7 @@ public class LocalQabelService extends Service {
 	private static final int DB_VERSION = 1;
 	private AndroidPersistence persistence;
 	private SharedPreferences sharedPreferences;
+	private DropHTTP dropHTTP;
 
 	private void setLastActiveIdentityID(String identityID) {
 		sharedPreferences.edit()
@@ -162,8 +166,27 @@ public class LocalQabelService extends Service {
 		return contacts;
 	}
 
-	public void sendDropMessage(DropMessage dropMessage, Contact recipient) {
-
+	/**
+	 * Send a single drop message to a single recipient, to all of his
+	 * drop urls. This method is blocking.
+	 *
+	 * @param dropMessage
+	 * @param recipient
+	 * @throws QblDropPayloadSizeException
+	 * @return the message was delivered to at least one drop url
+	 */
+	public boolean sendDropMessage(DropMessage dropMessage, Contact recipient) throws QblDropPayloadSizeException {
+		boolean success = false;
+		BinaryDropMessageV0 binaryMessage = new BinaryDropMessageV0(dropMessage);
+		for (DropURL u : recipient.getDropUrls()) {
+			HTTPResult<?> dropResult = dropHTTP.send(u.getUri(),
+					binaryMessage.assembleMessageFor(recipient));
+			int status = dropResult.getResponseCode();
+			if (status == 200) {
+				success = true;
+			}
+		}
+		return success;
 	}
 
 
@@ -192,6 +215,7 @@ public class LocalQabelService extends Service {
 	public void onCreate() {
 		super.onCreate();
 		Log.i(TAG, "LocalQabelService created");
+		dropHTTP = new DropHTTP();
 		sharedPreferences = getSharedPreferences(this.getClass().getCanonicalName(), MODE_PRIVATE);
 		AndroidPersistence androidPersistence;
 		QblSQLiteParams params = new QblSQLiteParams(this, DB_NAME, null, DB_VERSION);

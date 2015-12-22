@@ -22,6 +22,7 @@ import de.qabel.ServiceConstants;
 import de.qabel.core.config.Contact;
 import de.qabel.core.config.Identity;
 import de.qabel.core.drop.DropMessage;
+import de.qabel.core.exceptions.QblDropPayloadSizeException;
 import de.qabel.qabelbox.R;
 
 /**
@@ -85,7 +86,15 @@ public class QabelService extends Service {
                             if (sender != null && recipient != null) {
                                 DropMessage dropMessage = new DropMessage(sender, dropPayload, dropPayloadType);
                                 Log.i(LOG_TAG_QABEL_SERVICE, "Sending received DropMessage");
-                                mService.sendDropMessage(dropMessage, recipient);
+                                boolean success = false;
+                                try {
+                                    success = mService.sendDropMessage(dropMessage, recipient);
+                                } catch (QblDropPayloadSizeException e) {
+                                    Log.e(TAG, "Could not send drop message", e);
+                                }
+                                if (!success) {
+                                    Log.e(TAG, "Could not deliver drop message");
+                                }
                             }
                             break;
                         default:

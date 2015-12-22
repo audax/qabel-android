@@ -45,6 +45,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
 
+    private static final String PRIVATE_KEY = "foo";
+    private static final String PUB_KEY = "foo";
     private BoxVolume volume;
     final String bucket = BoxProvider.BUCKET;
     final String prefix = UUID.randomUUID().toString();
@@ -68,8 +70,8 @@ public class BoxProviderTest extends ProviderTestCase2<BoxProvider>{
         Log.d(TAG, "setUp");
         CryptoUtils utils = new CryptoUtils();
         byte[] deviceID = utils.getRandomBytes(16);
-        QblECKeyPair keyPair = new QblECKeyPair(Hex.decode(BoxProvider.PRIVATE_KEY));
-        ROOT_DOC_ID = BoxProvider.PUB_KEY + BoxProvider.DOCID_SEPARATOR + BoxProvider.BUCKET
+        QblECKeyPair keyPair = new QblECKeyPair(Hex.decode(PRIVATE_KEY));
+        ROOT_DOC_ID = PUB_KEY + BoxProvider.DOCID_SEPARATOR + BoxProvider.BUCKET
                 + BoxProvider.DOCID_SEPARATOR + prefix + BoxProvider.DOCID_SEPARATOR
                 + BoxProvider.PATH_SEP;
         BoxProvider provider = getProvider();
