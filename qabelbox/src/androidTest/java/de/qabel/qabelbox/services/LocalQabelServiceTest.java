@@ -92,4 +92,8 @@ public class LocalQabelServiceTest extends ServiceTestCase<LocalQabelService> {
 		assertTrue(contacts.get(secondIdentity).getContacts().contains(secondContact));
 	}
 
+	public void testKeyStoreInit() {
+		assertNotNull(mService.keyStore);
+	}
+
 }
