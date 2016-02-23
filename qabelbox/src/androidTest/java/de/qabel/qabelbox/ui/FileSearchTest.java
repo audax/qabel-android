@@ -79,7 +79,7 @@ public class FileSearchTest {
 
     @Before
     public void setUp() throws IOException, QblStorageException {
-
+        disableCrashreporting();
         mActivity = mActivityTestRule.getActivity();
         wakeLock = UIActionHelper.wakeupDevice(mActivity);
         mSystemAnimations = new SystemAnimations(mActivity);
@@ -102,8 +102,14 @@ public class FileSearchTest {
             e.printStackTrace();
         }
 
-        Identity identity = mBoxHelper.addIdentity("spoon");
+        mBoxHelper.addIdentity("spoon");
         uploadTestFiles();
+    }
+
+    public void disableCrashreporting() {
+        Context applicationContext = QabelBoxApplication.getInstance().getApplicationContext();
+        AppPreference pref = new AppPreference(applicationContext);
+        pref.setCrashreportingEnabled(false);
     }
 
     private void uploadTestFiles() {

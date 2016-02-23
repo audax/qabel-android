@@ -6,6 +6,7 @@ package de.qabel.qabelbox.ui;
 
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.PowerManager;
@@ -87,7 +88,7 @@ public class OpenImageTest {
 
     @Before
     public void setUp() throws IOException, QblStorageException {
-
+        disableCrashreporting();
         mActivity = mActivityTestRule.getActivity();
         Espresso.registerIdlingResources(mPicassoIdlingResource);
         ActivityLifecycleMonitorRegistry
@@ -114,6 +115,12 @@ public class OpenImageTest {
         Identity identity = mBoxHelper.addIdentity("spoon");
         mBoxHelper.setActiveIdentity(identity);
         uploadTestFiles();
+    }
+
+    public void disableCrashreporting() {
+        Context applicationContext = QabelBoxApplication.getInstance().getApplicationContext();
+        AppPreference pref = new AppPreference(applicationContext);
+        pref.setCrashreportingEnabled(false);
     }
 
     private void uploadTestFiles() {
