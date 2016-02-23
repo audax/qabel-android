@@ -109,7 +109,6 @@ public class MainActivity extends CrashReportingActivity
     private TextView textViewSelectedIdentity;
     private MainActivity self;
     private View appBarMain;
-    private FilesFragment filesFragment;
     private Toolbar toolbar;
     private ImageView imageViewExpandIdentity;
     private boolean identityMenuExpanded;
@@ -158,6 +157,12 @@ public class MainActivity extends CrashReportingActivity
     public void onResume() {
         Log.d(TAG, "onResume()");
         super.onResume();
+        executeOnBoundService(new Runnable() {
+            @Override
+            public void run() {
+                provider.notifyRootsUpdated();
+            }
+        });
     }
 
     @Override
@@ -213,11 +218,10 @@ public class MainActivity extends CrashReportingActivity
                 }
                 if (requestCode == REQUEST_CODE_UPLOAD_FILE) {
                     uri = data.getData();
-
+                    FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                     if (filesFragment != null) {
                         BoxNavigation boxNavigation = filesFragment.getBoxNavigation();
                         if (boxNavigation != null) {
-                            String path = boxNavigation.getPath();
                             VolumeFileTransferHelper.upload(self, uri, boxNavigation, boxVolume);
                         }
                     }
@@ -366,13 +370,11 @@ public class MainActivity extends CrashReportingActivity
                     }
                     break;
                 default:
-                    initFilesFragment();
-                    selectFilesFragment();
+                    selectFilesFragment(initFilesFragment());
                     break;
             }
         } else {
-            initFilesFragment();
-            selectFilesFragment();
+            selectFilesFragment(initFilesFragment());
         }
     }
 
@@ -536,6 +538,7 @@ public class MainActivity extends CrashReportingActivity
                 UIHelper.hideKeyboard(self, editText);
                 String newFolderName = editText.getText().toString();
                 if (!newFolderName.equals("")) {
+                    FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                     createFolder(newFolderName, filesFragment.getBoxNavigation());
                 }
             }
@@ -550,7 +553,7 @@ public class MainActivity extends CrashReportingActivity
      * @param boxObject
      */
     public void showFile(BoxObject boxObject) {
-
+        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
         Uri uri = VolumeFileTransferHelper.getUri(boxObject, boxVolume, filesFragment.getBoxNavigation());
         String type = getMimeType(uri);
         Log.v(TAG, "Mime type: " + type);
@@ -579,6 +582,7 @@ public class MainActivity extends CrashReportingActivity
     }
 
     private String getMimeType(BoxObject boxObject) {
+        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
         return getMimeType(VolumeFileTransferHelper.getUri(boxObject, boxVolume, filesFragment.getBoxNavigation()));
     }
 
@@ -599,12 +603,13 @@ public class MainActivity extends CrashReportingActivity
                         new AsyncTask<Void, Void, Void>() {
                             @Override
                             protected void onCancelled() {
-
+                                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                                 filesFragment.setIsLoading(false);
                             }
 
                             @Override
                             protected void onPreExecute() {
+                                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                                 filesFragment.setIsLoading(true);
                             }
 
@@ -612,6 +617,7 @@ public class MainActivity extends CrashReportingActivity
                             protected Void doInBackground(Void... params) {
 
                                 try {
+                                    FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                                     filesFragment.getBoxNavigation().delete(boxObject);
                                     filesFragment.getBoxNavigation().commit();
                                 } catch (QblStorageException e) {
@@ -658,7 +664,6 @@ public class MainActivity extends CrashReportingActivity
                             UIHelper.showDialogMessage(self, R.string.dialog_headline_warning, R.string.share_in_app_go_back_without_upload, R.string.yes, R.string.no, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
-
                                     getFragmentManager().popBackStack();
                                     //finish();
                                 }
@@ -668,6 +673,7 @@ public class MainActivity extends CrashReportingActivity
                     case TAG_FILES_FRAGMENT:
 
                         toggle.setDrawerIndicatorEnabled(true);
+                        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                         if (!filesFragment.handleBackPressed() && !filesFragment.browseToParent()) {
                             finishAffinity();
                         }
@@ -709,11 +715,11 @@ public class MainActivity extends CrashReportingActivity
     public boolean onNavigationItemSelected(MenuItem item) {
         // Handle navigation view item clicks here.
         int id = item.getItemId();
-
         if (id == R.id.nav_contacts) {
             selectContactsFragment();
         } else if (id == R.id.nav_browse) {
-            selectFilesFragment();
+            FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
+            selectFilesFragment(filesFragment);
         } else if (id == R.id.nav_help) {
             UIHelper.showFunctionNotYetImplemented(this);
         } else if (id == R.id.nav_inbox) {
@@ -746,15 +752,15 @@ public class MainActivity extends CrashReportingActivity
 
             @Override
             protected void onCancelled() {
-
+                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                 filesFragment.setIsLoading(false);
                 showAbortMessage();
             }
 
             @Override
             protected void onPreExecute() {
-
-                selectFilesFragment();
+                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
+                selectFilesFragment(filesFragment);
                 filesFragment.setIsLoading(true);
             }
 
@@ -770,7 +776,7 @@ public class MainActivity extends CrashReportingActivity
     public void selectIdentity(Identity identity) {
 
         changeActiveIdentity(identity);
-        selectFilesFragment();
+        selectFilesFragment(initFilesFragment());
     }
 
     public void addIdentity(final Identity identity) {
@@ -782,7 +788,7 @@ public class MainActivity extends CrashReportingActivity
                 provider.notifyRootsUpdated();
                 Snackbar.make(appBarMain, "Added identity: " + identity.getAlias(), Snackbar.LENGTH_LONG)
                         .show();
-                selectFilesFragment();
+                selectFilesFragment(initFilesFragment());
             }
         };
         executeOnBoundService(addIdentityOperation);
@@ -793,18 +799,19 @@ public class MainActivity extends CrashReportingActivity
 
         mService.setActiveIdentity(identity);
         textViewSelectedIdentity.setText(identity.getAlias());
+        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
         if (filesFragment != null) {
             getFragmentManager().beginTransaction().remove(filesFragment).commit();
             filesFragment = null;
         }
         initBoxVolume(identity);
-        initFilesFragment();
-        selectFilesFragment();
+        filesFragment = initFilesFragment();
+        selectFilesFragment(filesFragment);
     }
 
     //@todo move this to filesfragment
-    private void initFilesFragment() {
-
+    private FilesFragment initFilesFragment() {
+        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
         if (filesFragment != null) {
             getFragmentManager().beginTransaction().remove(filesFragment).commit();
         }
@@ -812,7 +819,7 @@ public class MainActivity extends CrashReportingActivity
         filesFragment.setOnItemClickListener(new FilesAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(View view, int position) {
-
+                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                 final BoxObject boxObject = filesFragment.getFilesAdapter().get(position);
                 if (boxObject != null) {
                     if (boxObject instanceof BoxFolder) {
@@ -826,13 +833,13 @@ public class MainActivity extends CrashReportingActivity
 
             @Override
             public void onItemLockClick(View view, final int position) {
-
+                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                 final BoxObject boxObject = filesFragment.getFilesAdapter().get(position);
                 new BottomSheet.Builder(self).title(boxObject.name).sheet(R.menu.files_bottom_sheet)
                         .listener(new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-
+                                FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
                                 switch (which) {
                                     case R.id.open:
                                         ExternalApps.openExternApp(self, VolumeFileTransferHelper.getUri(boxObject, boxVolume, filesFragment.getBoxNavigation()), getMimeType(boxObject), Intent.ACTION_VIEW);
@@ -860,6 +867,7 @@ public class MainActivity extends CrashReportingActivity
                         }).show();
             }
         });
+        return filesFragment;
     }
 
 
@@ -1104,7 +1112,7 @@ public class MainActivity extends CrashReportingActivity
     }
 
     private void refresh() {
-
+        FilesFragment filesFragment = (FilesFragment) getFragmentManager().findFragmentByTag(TAG_FILES_FRAGMENT);
         onDoRefresh(filesFragment, filesFragment.getBoxNavigation(), filesFragment.getFilesAdapter());
     }
 
@@ -1135,8 +1143,7 @@ public class MainActivity extends CrashReportingActivity
                 .commit();
     }
 
-    private void selectFilesFragment() {
-
+    private void selectFilesFragment(FilesFragment filesFragment) {
         fab.show();
         filesFragment.setIsLoading(false);
         getFragmentManager().beginTransaction()

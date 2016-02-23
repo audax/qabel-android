@@ -183,6 +183,7 @@ public class FilesFragment extends BaseFragment {
         updateSubtitle();
     }
 
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -248,6 +249,7 @@ public class FilesFragment extends BaseFragment {
         super.onAttach(activity);
         try {
             mListener = (FilesListListener) activity;
+            setIsLoading(isLoading);
         } catch (ClassCastException e) {
             throw new ClassCastException(activity.toString()
                     + " must implement FilesListListener");

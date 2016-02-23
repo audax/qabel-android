@@ -170,14 +170,16 @@ public class FileSearchTest {
 
         //uploadAndDeleteLocalfile file
         mBoxHelper.uploadFile(mBoxHelper.mBoxVolume, "black_3", new byte[1024], "");
-        mBoxHelper.waitUntilFileCount(fileCount + 1);
+        int uploadedFilesCount = 1;
+        mBoxHelper.waitUntilFileCount(fileCount + uploadedFilesCount);
 
         onView(withId(R.id.files_list)).perform(swipeDown());
         onView(withId(R.id.files_list)).check(matches(QabelMatcher.withListSize(fileCount + 1)));
         Spoon.screenshot(mActivity, "after_refresh");
         pressBack();
+        UITestHelper.sleep(500);
         Spoon.screenshot(mActivity, "after_press_back");
-        testIfFileBrowserDisplayed(fileCount + 1);
+        assertFilebrowserItemCount(fileCount + uploadedFilesCount);
 
         //start new search
         text = "black";
@@ -205,10 +207,10 @@ public class FileSearchTest {
         onView(withId(R.id.files_list)).check(matches(QabelMatcher.withListSize(results)));
         Spoon.screenshot(mActivity, "results_" + text);
         pressBack();
-        testIfFileBrowserDisplayed(7);
+        assertFilebrowserItemCount(7);
     }
 
-    private void testIfFileBrowserDisplayed(int count) {
+    private void assertFilebrowserItemCount(int count) {
 
         QabelMatcher.matchToolbarTitle(mActivity.getString(R.string.headline_files))
                 .check(matches(isDisplayed()));
@@ -243,7 +245,7 @@ public class FileSearchTest {
         }
 
         pressBack();
-        testIfFileBrowserDisplayed(7);
+        assertFilebrowserItemCount(7);
     }
 }
 
