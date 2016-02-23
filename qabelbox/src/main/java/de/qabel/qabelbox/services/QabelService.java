@@ -38,6 +38,8 @@ import de.qabel.qabelbox.R;
  * unbinds.
  */
 @SuppressWarnings("JavadocReference")
+@Deprecated
+// TODO: will be overhauled
 public class QabelService extends Service {
 
     private static final int SERVICE_NOTIFICATION_ID = 1;

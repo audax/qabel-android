@@ -41,8 +41,11 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import de.qabel.core.config.Identity;
 import de.qabel.qabelbox.QabelBoxApplication;
@@ -69,6 +72,7 @@ import de.qabel.qabelbox.storage.BoxFolder;
 import de.qabel.qabelbox.storage.BoxNavigation;
 import de.qabel.qabelbox.storage.BoxObject;
 import de.qabel.qabelbox.storage.BoxVolume;
+
 
 public class MainActivity extends CrashReportingActivity
         implements NavigationView.OnNavigationItemSelectedListener,
@@ -98,9 +102,9 @@ public class MainActivity extends CrashReportingActivity
     private static final int REQUEST_CODE_OPEN = 21;
     private static final int REQUEST_CODE_DELETE_FILE = 22;
     private DrawerLayout drawer;
-    public BoxVolume boxVolume;
     public ActionBarDrawerToggle toggle;
     private BoxProvider provider;
+    public BoxVolume boxVolume;
     public FloatingActionButton fab;
     private TextView textViewSelectedIdentity;
     private MainActivity self;
@@ -115,7 +119,65 @@ public class MainActivity extends CrashReportingActivity
     private Uri exportUri;
     public LocalQabelService mService;
     private ServiceConnection mServiceConnection;
+    private BlockingQueue<Runnable> mPendingServiceOperations = new LinkedBlockingQueue<>();
+
+
     private SelectUploadFolderFragment shareFragment;
+
+
+
+
+    /*
+                Life Cycle Managment
+     */
+
+    protected void onCreate(Bundle savedInstanceState) {
+
+        super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate " + this.hashCode());
+
+        if (Sanity.startWizardActivities(this)) {
+            Log.d(TAG, "started wizard dialog");
+            return;
+        }
+        setContentView(R.layout.activity_main);
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        appBarMain = findViewById(R.id.app_bap_main);
+        fab = (FloatingActionButton) findViewById(R.id.fab);
+        self = this;
+        initFloatingActionButton();
+
+
+        bindLocalQabelService();
+        addBackStackListener();
+    }
+
+
+    @Override
+    public void onResume() {
+        Log.d(TAG, "onResume()");
+        super.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        Log.d(TAG, "onPause()");
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        Log.d(TAG, "onDestroy()");
+        super.onPause();
+        if (mServiceConnection != null && mService != null) {
+            unbindService(mServiceConnection);
+        }
+        if (isTaskRoot()) {
+            new CacheFileHelper().freeCacheAsynchron(QabelBoxApplication.getInstance().getApplicationContext());
+        }
+        super.onDestroy();
+    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -205,75 +267,9 @@ public class MainActivity extends CrashReportingActivity
         }
     }
 
-    private boolean uploadUri(Uri uri, String targetFolder) {
-
-        Toast.makeText(self, R.string.uploading_file,
-                Toast.LENGTH_SHORT).show();
-        boolean result = VolumeFileTransferHelper.uploadUri(self, uri, targetFolder, mService.getActiveIdentity());
-        if (!result) {
-            Toast.makeText(self, R.string.message_file_cant_upload, Toast.LENGTH_SHORT).show();
-        }
-        return result;
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-
-        super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate " + this.hashCode());
-        Intent serviceIntent = new Intent(this, LocalQabelService.class);
-        mServiceConnection = getServiceConnection();
-        if (Sanity.startWizardActivities(this)) {
-            Log.d(TAG, "started wizard dialog");
-            return;
-        }
-        setContentView(R.layout.activity_main);
-        toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        appBarMain = findViewById(R.id.app_bap_main);
-        fab = (FloatingActionButton) findViewById(R.id.fab);
-        self = this;
-        initFloatingActionButton();
-
-        bindService(serviceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
-
-        addBackStackListener();
-    }
-
-    private void addBackStackListener() {
-
-        getFragmentManager().addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
-            @Override
-            public void onBackStackChanged() {
-                // Set FAB visibility according to currently visible fragment
-                Fragment activeFragment = getFragmentManager().findFragmentById(R.id.fragment_container);
-
-                if (activeFragment instanceof BaseFragment) {
-                    BaseFragment fragment = ((BaseFragment) activeFragment);
-                    toolbar.setTitle(fragment.getTitle());
-                    if (fragment.isFabNeeded()) {
-                        fab.show();
-                    } else {
-                        fab.hide();
-                    }
-                    if (!fragment.supportSubtitle()) {
-                        toolbar.setSubtitle(null);
-                    } else {
-                        fragment.updateSubtitle();
-                    }
-                }
-                //check if navigation drawer need to reset
-                if (getFragmentManager().getBackStackEntryCount() == 0 || (activeFragment instanceof BaseFragment) && !((BaseFragment) activeFragment).supportBackButton()) {
-                    if (activeFragment instanceof SelectUploadFolderFragment) {
-                    } else {
-
-                        getSupportActionBar().setDisplayHomeAsUpEnabled(false);
-                        toggle.setDrawerIndicatorEnabled(true);
-                    }
-                }
-            }
-        });
-    }
+    /*
+        Service Helpers
+     */
 
     @NonNull
     private ServiceConnection getServiceConnection() {
@@ -282,18 +278,45 @@ public class MainActivity extends CrashReportingActivity
 
             @Override
             public void onServiceConnected(ComponentName name, IBinder service) {
+                Log.d(TAG, "Connected LocalQabelService");
 
                 LocalQabelService.LocalBinder binder = (LocalQabelService.LocalBinder) service;
                 mService = binder.getService();
                 onLocalServiceConnected(getIntent());
+                executeOperationsWaitingForService();
             }
 
             @Override
             public void onServiceDisconnected(ComponentName name) {
-
+                Log.d(TAG, "Disconnected LocalQabelService");
                 mService = null;
             }
         };
+    }
+
+    private void bindLocalQabelService() {
+        Log.d(TAG, "Binding Service");
+        Intent serviceIntent = new Intent(this, LocalQabelService.class);
+        mServiceConnection = getServiceConnection();
+        bindService(serviceIntent, mServiceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    private void executeOnBoundService(Runnable operation) {
+        if (mService != null) {
+            executeOperationsWaitingForService();
+            operation.run();
+        } else {
+            mPendingServiceOperations.add(operation);
+        }
+    }
+
+    private void executeOperationsWaitingForService() {
+        Iterator<Runnable> operationsIter = mPendingServiceOperations.iterator();
+        while (operationsIter.hasNext()) {
+            Runnable operation = operationsIter.next();
+            operation.run();
+            operationsIter.remove();
+        }
     }
 
     private void onLocalServiceConnected(Intent intent) {
@@ -352,6 +375,51 @@ public class MainActivity extends CrashReportingActivity
             selectFilesFragment();
         }
     }
+
+    /*
+            UI and Buisness Logic Helper
+            // TODO: Extract and refactor to a MVVM-Architecture
+     */
+
+
+    private void addBackStackListener() {
+
+        getFragmentManager().addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
+            @Override
+            public void onBackStackChanged() {
+                // Set FAB visibility according to currently visible fragment
+                Fragment activeFragment = getFragmentManager().findFragmentById(R.id.fragment_container);
+
+                if (activeFragment instanceof BaseFragment) {
+                    BaseFragment fragment = ((BaseFragment) activeFragment);
+                    toolbar.setTitle(fragment.getTitle());
+                    if (fragment.isFabNeeded()) {
+                        fab.show();
+                    } else {
+                        fab.hide();
+                    }
+                    if (!fragment.supportSubtitle()) {
+                        toolbar.setSubtitle(null);
+                    } else {
+                        fragment.updateSubtitle();
+                    }
+                }
+                //check if navigation drawer need to reset
+                if (getFragmentManager().getBackStackEntryCount() == 0 || (activeFragment instanceof BaseFragment) && !((BaseFragment) activeFragment).supportBackButton()) {
+                    if (activeFragment instanceof SelectUploadFolderFragment) {
+                    } else {
+
+                        getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+                        toggle.setDrawerIndicatorEnabled(true);
+                    }
+                }
+            }
+        });
+    }
+
+
+
+
 
     public void refreshFilesBrowser(Identity activeIdentity) {
 
@@ -510,15 +578,11 @@ public class MainActivity extends CrashReportingActivity
         startActivityForResult(Intent.createChooser(viewIntent, "Open with"), REQUEST_EXTERN_VIEWER_APP);
     }
 
-    //@todo move outside
     private String getMimeType(BoxObject boxObject) {
-
         return getMimeType(VolumeFileTransferHelper.getUri(boxObject, boxVolume, filesFragment.getBoxNavigation()));
     }
 
-    //@todo move outside
     private String getMimeType(Uri uri) {
-
         return URLConnection.guessContentTypeFromName(uri.toString());
     }
 
@@ -541,7 +605,6 @@ public class MainActivity extends CrashReportingActivity
 
                             @Override
                             protected void onPreExecute() {
-
                                 filesFragment.setIsLoading(true);
                             }
 
@@ -559,7 +622,6 @@ public class MainActivity extends CrashReportingActivity
 
                             @Override
                             protected void onPostExecute(Void aVoid) {
-
                                 refresh();
                             }
                         }.execute();
@@ -711,15 +773,21 @@ public class MainActivity extends CrashReportingActivity
         selectFilesFragment();
     }
 
-    public void addIdentity(Identity identity) {
-
-        mService.addIdentity(identity);
-        changeActiveIdentity(identity);
-        provider.notifyRootsUpdated();
-        Snackbar.make(appBarMain, "Added identity: " + identity.getAlias(), Snackbar.LENGTH_LONG)
-                .show();
-        selectFilesFragment();
+    public void addIdentity(final Identity identity) {
+        Runnable addIdentityOperation = new Runnable() {
+            @Override
+            public void run() {
+                mService.addIdentity(identity);
+                changeActiveIdentity(identity);
+                provider.notifyRootsUpdated();
+                Snackbar.make(appBarMain, "Added identity: " + identity.getAlias(), Snackbar.LENGTH_LONG)
+                        .show();
+                selectFilesFragment();
+            }
+        };
+        executeOnBoundService(addIdentityOperation);
     }
+
 
     public void changeActiveIdentity(Identity identity) {
 
@@ -871,18 +939,7 @@ public class MainActivity extends CrashReportingActivity
         startActivityForResult(intent, REQUEST_CODE_CHOOSE_EXPORT);
     }
 
-    @Override
-    protected void onDestroy() {
 
-        if (mServiceConnection != null && mService != null) {
-
-            unbindService(mServiceConnection);
-        }
-        if (isTaskRoot()) {
-            new CacheFileHelper().freeCacheAsynchron(QabelBoxApplication.getInstance().getApplicationContext());
-        }
-        super.onDestroy();
-    }
 
     @Override
     public void onDoRefresh(final FilesFragment filesFragment, final BoxNavigation boxNavigation, final FilesAdapter filesAdapter) {
@@ -1087,4 +1144,17 @@ public class MainActivity extends CrashReportingActivity
                 .commit();
         filesFragment.updateSubtitle();
     }
+
+    private boolean uploadUri(Uri uri, String targetFolder) {
+
+        Toast.makeText(self, R.string.uploading_file,
+                Toast.LENGTH_SHORT).show();
+        boolean result = VolumeFileTransferHelper.uploadUri(self, uri, targetFolder, mService.getActiveIdentity());
+        if (!result) {
+            Toast.makeText(self, R.string.message_file_cant_upload, Toast.LENGTH_SHORT).show();
+        }
+        return result;
+    }
+
+
 }

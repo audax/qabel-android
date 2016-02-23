@@ -71,7 +71,6 @@ public class CreateIdentityTest {
 
     @After
     public void cleanUp() {
-
         wakeLock.release();
         mSystemAnimations.enableAll();
         clearIdentities();
@@ -86,8 +85,16 @@ public class CreateIdentityTest {
 
     }
 
+    public void disableCrashreporting() {
+        Context applicationContext = QabelBoxApplication.getInstance().getApplicationContext();
+        AppPreference pref = new AppPreference(applicationContext);
+        pref.setCrashreportingEnabled(false);
+    }
+
+
     @Before
     public void setUp() throws IOException, QblStorageException {
+        disableCrashreporting();
         configureTestServer();
         mActivity = mActivityTestRule.getActivity();
         wakeLock = UIActionHelper.wakeupDevice(mActivity);
@@ -138,14 +145,13 @@ public class CreateIdentityTest {
         onView(withText(R.string.headline_files)).check(matches(isDisplayed()));
 
         //create spoon 2 identity
-
         openDrawer(identity);
         onView(withText(R.string.add_identity)).check(matches(isDisplayed())).perform(click());
         Spoon.screenshot(UITestHelper.getCurrentActivity(mActivity), "spoon1");
         //go to add identity, enter no data and go back
         createIdentity(identity2);
         UITestHelper.sleep(500);
-        onView(allOf(withText(identity), withParent(withId(R.id.select_identity_layout)))).check(matches(isDisplayed()));
+        onView(allOf(withText(identity2), withParent(withId(R.id.select_identity_layout)))).check(matches(isDisplayed()));
         //check if 2 identities displayer
         //create spoon 2 identity
         onView(withId(R.id.drawer_layout)).check(matches(isDisplayed())).perform(QabelViewAction.actionCloseDrawer());

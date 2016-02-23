@@ -26,11 +26,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import de.qabel.core.config.Contact;
@@ -64,7 +62,6 @@ public class LocalQabelService extends Service {
 
     private static final String TAG = "LocalQabelService";
     private static final String PREF_LAST_ACTIVE_IDENTITY = "PREF_LAST_ACTIVE_IDENTITY";
-    public static final String DEFAULT_DROP_SERVER = "http://localhost";
 
     private static final String PREF_DEVICE_ID_CREATED = "PREF_DEVICE_ID_CREATED";
     private static final String PREF_DEVICE_ID = "PREF_DEVICE_ID";
@@ -81,7 +78,6 @@ public class LocalQabelService extends Service {
 	private Queue<BoxUploadingFile> uploadingQueue;
 	private Map<String, Map<String, BoxFile>> cachedFinishedUploads;
     private DocumentIdParser documentIdParser;
-	private Context self;
 
     SharedPreferences sharedPreferences;
 
@@ -494,7 +490,6 @@ public class LocalQabelService extends Service {
 		documentIdParser = new DocumentIdParser();
 		cachedFinishedUploads = Collections.synchronizedMap(new HashMap<String, Map<String, BoxFile>>());
 		uploadingQueue = new LinkedBlockingDeque<>();
-		self = this;
     }
 
     protected void initAndroidPersistence() {

@@ -13,6 +13,7 @@ public class AppPreference {
     private final String P_LAST_APP_START_VERSION = "lastappstartversion";
     private final String P_LAST_APP_UPDATE_QUESTION_TIME = "lastupdatequestiontime";
     private final long NEW_UPATE_QUESTION_TIME_INTERVAL = 1000 * 60 * 60 * 24 * 3l;
+    private final String P_ENABLEBUGREPORTING = "enable_bugreporting";
 
     public AppPreference(Context context) {
 
@@ -52,5 +53,13 @@ public class AppPreference {
     public boolean shouldUpdateQuestionShowed(long currentTime) {
 
         return getLastAppUpdateQuestion() + NEW_UPATE_QUESTION_TIME_INTERVAL < currentTime;
+    }
+
+    public void setCrashreportingEnabled(boolean enableReporting) {
+        settings.edit().putBoolean(P_ENABLEBUGREPORTING, enableReporting).commit();
+    }
+
+    public boolean isCrashreportingEnabled() {
+        return settings.getBoolean(P_ENABLEBUGREPORTING, false);
     }
 }

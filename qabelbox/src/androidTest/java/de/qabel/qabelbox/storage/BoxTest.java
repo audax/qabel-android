@@ -8,8 +8,6 @@ import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,8 +43,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 
 public class BoxTest extends AndroidTestCase {
-    private static final Logger logger = LoggerFactory.getLogger(BoxTest.class.getName());
-	private static final QblECPublicKey OWNER = new QblECKeyPair().getPub();
+    private static final QblECPublicKey OWNER = new QblECKeyPair().getPub();
 
     Identity identity;
     Identity identityOtherUser;

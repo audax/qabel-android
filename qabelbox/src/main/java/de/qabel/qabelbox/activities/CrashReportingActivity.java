@@ -1,7 +1,6 @@
 package de.qabel.qabelbox.activities;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -9,8 +8,9 @@ import android.util.Log;
 import net.hockeyapp.android.CrashManager;
 import net.hockeyapp.android.UpdateManager;
 
+import de.qabel.qabelbox.QabelBoxApplication;
 import de.qabel.qabelbox.R;
-import de.qabel.qabelbox.fragments.SettingsFragment;
+import de.qabel.qabelbox.config.AppPreference;
 
 /**
  * Created by danny on 05.02.16.
@@ -56,10 +56,9 @@ public class CrashReportingActivity extends AppCompatActivity {
         super.onResume();
 
         if (handleCrashes) {
-            SharedPreferences preferences = getSharedPreferences(
-                    SettingsFragment.APP_PREF_NAME,
-                    Context.MODE_PRIVATE);
-            if (preferences.getBoolean(getString(R.string.settings_key_bugreporting_enabled), true)) {
+            Context applicationContext = QabelBoxApplication.getInstance().getApplicationContext();
+            AppPreference pref = new AppPreference(applicationContext);
+            if (pref.isCrashreportingEnabled()) {
                 Log.v(TAG, "install crash reporting handler");
                 CrashManager.register(this, getString(R.string.hockeykey));
             } else {
